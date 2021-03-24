@@ -5,7 +5,7 @@ from .image import (
     DukeMTMCreID, iLIDS
 )
 from .video import PRID2011, Mars, DukeMTMCVidReID, iLIDSVID
-from .dataset import Dataset, ImageDataset, VideoDataset
+from .dataset import Dataset, ImageDataset, VideoDataset # (called but not used here)
 
 __image_datasets = {
     'market1501': Market1501,
