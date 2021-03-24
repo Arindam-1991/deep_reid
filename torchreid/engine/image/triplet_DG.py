@@ -6,7 +6,7 @@ from torchreid.losses import TripletLoss, CrossEntropyLoss
 from ..engine import Engine
 
 
-class ImageTripletEngine(Engine):
+class ImageTripletEngine_DG(Engine):
     r"""Triplet-loss engine for image-reid.
     Args:
         datamanager (DataManager): an instance of ``torchreid.data.ImageDataManager``
