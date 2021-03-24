@@ -446,6 +446,13 @@ class Engine(object):
         imgs = data['img']
         pids = data['pid']
         return imgs, pids
+    
+    def parse_data_for_train_DG(self, data):
+        imgs = data['img']
+        pids = data['pid']
+        camids = data['camid']
+        dsetids = data['dsetid']
+        return imgs, pids, camids, dsetids
 
     def parse_data_for_eval(self, data):
         imgs = data['img']
