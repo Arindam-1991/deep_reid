@@ -91,7 +91,9 @@ class ImageTripletEngine(Engine):
         )
 
     def forward_backward(self, data):
-        imgs, pids = self.parse_data_for_train(data)
+        imgs, pids, camids, dsetids = self.parse_data_for_train_DG(data)
+        print('... camids ... {}'.format(camids))
+        print('... dsetids ... {}'.format(dsetids))
 
         if self.use_gpu:
             imgs = imgs.cuda()
