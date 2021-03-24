@@ -299,6 +299,7 @@ class Dataset(object):
 
         return img
 
+# -------------------------------------------------------------------------------------- #
 
 class ImageDataset(Dataset):
     """A base class representing ImageDataset.
@@ -359,7 +360,8 @@ class ImageDataset(Dataset):
         )
         print('  ----------------------------------------')
 
-
+        
+# -------------------------------------------------------------------------------------- #
 class VideoDataset(Dataset):
     """A base class representing VideoDataset.
 
