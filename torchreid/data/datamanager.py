@@ -85,6 +85,8 @@ class DataManager(object):
         """Transforms a PIL image to torch tensor for testing."""
         return self.transform_te(img)
 
+    
+# ===================================================================================================================================================== #
 
 class ImageDataManager(DataManager):
     r"""Image data manager.
@@ -347,6 +349,9 @@ class ImageDataManager(DataManager):
         print('\n')
 
 
+ # ===================================================================================================================================================== #       
+        
+        
 class VideoDataManager(DataManager):
     r"""Video data manager.
 
