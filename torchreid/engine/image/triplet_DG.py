@@ -2,6 +2,7 @@ from __future__ import division, print_function, absolute_import
 
 from torchreid import metrics
 from torchreid.losses import TripletLoss, CrossEntropyLoss
+from torchreid.losses import MMDLoss
 
 from ..engine import Engine
 
@@ -65,6 +66,7 @@ class ImageTripletEngine_DG(Engine):
         margin=0.3,
         weight_t=1,
         weight_x=1,
+        weight_mmd=0.2,
         scheduler=None,
         use_gpu=True,
         label_smooth=True
@@ -80,6 +82,7 @@ class ImageTripletEngine_DG(Engine):
         assert weight_t + weight_x > 0
         self.weight_t = weight_t
         self.weight_x = weight_x
+        self.weight_mmd = weight_mmd
 
         self.criterion_t = TripletLoss(margin=margin)
         self.criterion_x = CrossEntropyLoss(
@@ -87,15 +90,18 @@ class ImageTripletEngine_DG(Engine):
             use_gpu=self.use_gpu,
             label_smooth=label_smooth
         )
+        self.criterion_mmd = MMDLoss()
 
     def forward_backward(self, data):
         imgs, pids, camids, dsetids = self.parse_data_for_train_DG(data)
+        # print('... camids ... {} '.format(camids))
 
         if self.use_gpu:
             imgs = imgs.cuda()
             pids = pids.cuda()
 
         outputs, features = self.model(imgs)
+        # print('... Shape of features : {}'.format(features.size()))
 
         loss = 0
         loss_summary = {}
@@ -110,6 +116,13 @@ class ImageTripletEngine_DG(Engine):
             loss += self.weight_x * loss_x
             loss_summary['loss_x'] = loss_x.item()
             loss_summary['acc'] = metrics.accuracy(outputs, pids)[0].item()
+
+        if self.weight_mmd > 0:
+            loss_mmd = self.compute_loss(self.criterion_mmd, outputs, camids)
+            loss += self.weight_mmd * loss_mmd
+            loss_summary['loss_mmd'] = loss_mmd.item()
+
+
 
         assert loss_summary
 
