@@ -69,7 +69,7 @@ class ImageTripletEngine_DG(Engine):
         use_gpu=True,
         label_smooth=True
     ):
-        super(ImageTripletEngine, self).__init__(datamanager, use_gpu)
+        super(ImageTripletEngine_DG, self).__init__(datamanager, use_gpu)
 
         self.model = model
         self.optimizer = optimizer
