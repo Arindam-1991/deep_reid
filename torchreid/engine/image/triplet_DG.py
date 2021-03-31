@@ -1,5 +1,6 @@
 from __future__ import division, print_function, absolute_import
 
+import torch
 from torchreid import metrics
 from torchreid.losses import TripletLoss, CrossEntropyLoss
 from torchreid.losses import MMDLoss
@@ -90,7 +91,14 @@ class ImageTripletEngine_DG(Engine):
             use_gpu=self.use_gpu,
             label_smooth=label_smooth
         )
-        self.criterion_mmd = MMDLoss()
+        self.criterion_mmd = MMDLoss(
+            instances=self.datamanager.train_loader.sampler.num_instances,
+            batch_size=self.datamanager.train_loader.batch_size,
+            global_only=False,
+            distance_only=True,
+            all=False
+            )
+        print('... In TripletDG instances : {}, batch_size : {}'.format(self.datamanager.train_loader.sampler.num_instances, self.datamanager.train_loader.batch_size))
 
     def forward_backward(self, data):
         imgs, pids, camids, dsetids = self.parse_data_for_train_DG(data)
@@ -102,9 +110,12 @@ class ImageTripletEngine_DG(Engine):
 
         outputs, features = self.model(imgs)
         # print('... Shape of features : {}'.format(features.size()))
+        # t = torch.reshape(features, (int(32 / 4), 4, 2048))
+        # print('... Shape of transformed features : {}'.format(t.size()))
 
         loss = 0
         loss_summary = {}
+        # print("Algorithm is at epoch : {}".format(self.epoch))
 
         if self.weight_t > 0:
             loss_t = self.compute_loss(self.criterion_t, features, pids)
@@ -118,10 +129,11 @@ class ImageTripletEngine_DG(Engine):
             loss_summary['acc'] = metrics.accuracy(outputs, pids)[0].item()
 
         if self.weight_mmd > 0:
-            loss_mmd = self.compute_loss(self.criterion_mmd, outputs, camids)
+            loss_mmd = self.compute_loss(self.criterion_mmd, features, camids)
+            # loss_mmd = loss_mmd_global + loss_mmd_bc + loss_mmd_wc
+            #loss = loss_t + loss_x + (loss_mmd_bc + loss_mmd_wc + loss_mmd_global)
             loss += self.weight_mmd * loss_mmd
             loss_summary['loss_mmd'] = loss_mmd.item()
-
 
 
         assert loss_summary
