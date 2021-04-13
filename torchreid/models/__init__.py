@@ -22,6 +22,8 @@ from .resnet_ibn_b import *
 from .shufflenetv2 import *
 from .inceptionresnetv2 import *
 from .visualTransformer import *
+from .resmap import resbackbone
+from .qaconv import qaconv
 
 __model_factory = {
     # image classification models
@@ -48,6 +50,7 @@ __model_factory = {
     'xception': xception,
     'resnet50_ibn_a': resnet50_ibn_a,
     'resnet50_ibn_b': resnet50_ibn_b,
+    
     # lightweight models
     'nasnsetmobile': nasnetamobile,
     'mobilenetv2_x1_0': mobilenetv2_x1_0,
@@ -60,6 +63,7 @@ __model_factory = {
     'shufflenet_v2_x1_0': shufflenet_v2_x1_0,
     'shufflenet_v2_x1_5': shufflenet_v2_x1_5,
     'shufflenet_v2_x2_0': shufflenet_v2_x2_0,
+    
     # reid-specific models
     'mudeep': MuDeep,
     'resnet50mid': resnet50mid,
@@ -73,8 +77,13 @@ __model_factory = {
     'osnet_x0_25': osnet_x0_25,
     'osnet_ibn_x1_0': osnet_ibn_x1_0,
     'osnet_ain_x1_0': osnet_ain_x1_0,
+    
     # Visual transformer
-    'ViT': vit
+    'ViT': vit,
+    
+    # Query-Adaptive Convolution modules
+    'QA_resnet50': resbackbone,
+    'QAConv' : qaconv
 }
 
 
@@ -114,10 +123,15 @@ def build_model(
         raise KeyError(
             'Unknown model: {}. Must be one of {}'.format(name, avai_models)
         )
-    return __model_factory[name](
+
+    if name in ['QA_resnet50', 'QAConv']:
+        model = __model_factory[name](name.split('_')[-1], *args, **kwargs)
+    else:
+        model = __model_factory[name](
         num_classes=num_classes,
         loss=loss,
         pretrained=pretrained,
         use_gpu=use_gpu,
-        *args, **kwargs
-    )
+        *args, **kwargs)
+
+    return model
