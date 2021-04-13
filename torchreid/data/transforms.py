@@ -249,6 +249,9 @@ def build_transforms(
         norm_std (list or None, optional): normalization standard deviation values. Default is
             ImageNet standard deviation values.
     """
+    
+    QAConv_T = 'QA_Transfrom' in transforms
+
     if transforms is None:
         transforms = []
 
@@ -274,7 +277,10 @@ def build_transforms(
     transform_tr = []
 
     print('+ resize to {}x{}'.format(height, width))
-    transform_tr += [Resize((height, width))]
+    if QAConv_T:
+        transform_tr += [Resize((height, width), interpolation=3)]
+    else:
+        transform_tr += [Resize((height, width))]
 
     if 'random_flip' in transforms:
         print('+ random flip')
@@ -304,7 +310,8 @@ def build_transforms(
     transform_tr += [ToTensor()]
 
     print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
-    transform_tr += [normalize]
+    if not QAConv_T:
+        transform_tr += [normalize]
 
     if 'random_erase' in transforms:
         print('+ random erase')
@@ -317,10 +324,15 @@ def build_transforms(
     print('+ to torch tensor of range [0, 1]')
     print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
 
-    transform_te = Compose([
-        Resize((height, width)),
-        ToTensor(),
-        normalize,
-    ])
+    if QAConv_T:
+        transform_te = transform_tr
+    else:
+        transform_te = Compose([
+            Resize((height, width)),
+            ToTensor(),
+            normalize,
+        ])
+    print('printing transform train', transform_tr)
+    print('printing transform test', transform_te)
 
     return transform_tr, transform_te
