@@ -309,8 +309,9 @@ def build_transforms(
     print('+ to torch tensor of range [0, 1]')
     transform_tr += [ToTensor()]
 
-    print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
+    # Normalization is not performed for QA_transform
     if not QAConv_T:
+        print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
         transform_tr += [normalize]
 
     if 'random_erase' in transforms:
@@ -332,7 +333,7 @@ def build_transforms(
             ToTensor(),
             normalize,
         ])
-#     print('printing transform train', transform_tr)
-#     print('printing transform test', transform_te)
+    # print('printing transform train', transform_tr)
+    # print('printing transform test', transform_te)
 
     return transform_tr, transform_te
