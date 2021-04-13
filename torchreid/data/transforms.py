@@ -332,7 +332,7 @@ def build_transforms(
             ToTensor(),
             normalize,
         ])
-    print('printing transform train', transform_tr)
-    print('printing transform test', transform_te)
+#     print('printing transform train', transform_tr)
+#     print('printing transform test', transform_te)
 
     return transform_tr, transform_te
