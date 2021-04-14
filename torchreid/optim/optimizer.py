@@ -10,6 +10,7 @@ AVAI_OPTIMS = ['adam', 'amsgrad', 'sgd', 'rmsprop', 'radam']
 
 def build_optimizer(
     model,
+    matcher = None,
     optim='adam',
     lr=0.0003,
     weight_decay=5e-04,
@@ -21,7 +22,8 @@ def build_optimizer(
     adam_beta2=0.99,
     staged_lr=False,
     new_layers='',
-    base_lr_mult=0.1
+    base_lr_mult=0.1,
+    QAConv_optimize = False,
 ):
     """A function wrapper for building an optimizer.
 
@@ -75,7 +77,7 @@ def build_optimizer(
             'model given to build_optimizer must be an instance of nn.Module'
         )
 
-    if staged_lr:
+    if staged_lr and not QAConv_optimize:
         if isinstance(new_layers, str):
             if new_layers is None:
                 warnings.warn(
@@ -107,9 +109,22 @@ def build_optimizer(
             },
         ]
 
+    elif QAConv_optimize:
+        # Additional modification for only for QAConv Optimization
+        assert matcher is not None, "With QAConv_optimize set True matcher cannot be None!"
+        base_param_ids = set(map(id, model.base.parameters()))
+        new_params = [p for p in model.parameters() if
+                      id(p) not in base_param_ids]
+        param_groups = [
+            {'params': model.base.parameters(), 'lr': 0.1 * lr},
+            {'params': new_params, 'lr': lr},
+            {'params': matcher.parameters(), 'lr': lr}]
+
     else:
         param_groups = model.parameters()
 
+
+    # Differnt optimizers selection
     if optim == 'adam':
         optimizer = torch.optim.Adam(
             param_groups,
