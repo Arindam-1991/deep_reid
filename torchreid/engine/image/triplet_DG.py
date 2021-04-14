@@ -9,7 +9,7 @@ from ..engine import Engine
 
 
 class ImageTripletEngine_DG(Engine):
-    r"""Triplet-loss engine for image-reid.
+    r"""Triplet-loss engine for Domain generalized image-reid.
     Args:
         datamanager (DataManager): an instance of ``torchreid.data.ImageDataManager``
             or ``torchreid.data.VideoDataManager``.
@@ -107,6 +107,8 @@ class ImageTripletEngine_DG(Engine):
         if self.use_gpu:
             imgs = imgs.cuda()
             pids = pids.cuda()
+            camids = camids.cuda()
+            dsetids = dsetids.cuda()
 
         outputs, features = self.model(imgs)
         # print('... Shape of features : {}'.format(features.size()))
