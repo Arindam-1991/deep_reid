@@ -177,7 +177,7 @@ class ImageDataManager(DataManager):
         train_sampler_t='RandomSampler',
         cuhk03_labeled=False,
         cuhk03_classic_split=False,
-        market1501_500k=False
+        market1501_500k=False,
     ):
 
         super(ImageDataManager, self).__init__(
@@ -191,8 +191,86 @@ class ImageDataManager(DataManager):
             use_gpu=use_gpu
         )
 
-        print('=> Loading train (source) dataset')
         trainset = []
+        train_set_t = []
+        self.args = (trainset,
+            train_set_t,
+            root,
+            k_tfm, 
+            train_sampler,
+            batch_size_train,
+            num_instances,
+            num_cams,
+            workers,
+            num_datasets,
+            combineall,
+            load_train_targets,
+            split_id, 
+            cuhk03_labeled, 
+            cuhk03_classic_split, 
+            market1501_500k)
+
+        if 'QA_Transfrom' in transforms:
+            self.after_transform = self.transform_tr
+            self.transform_tr = self.transform_te
+
+        # print('Transform_tr {} '.format(self.transform_tr))
+        # print('Transform_te {}'.format(self.transform_te))
+
+        # Setting train loader
+        len_trainset, len_trainset_t = self.init_train_loader(
+            *self.args
+            )
+
+        # Setting test loader
+        self.init_test_loader(
+            root,
+            batch_size_test,
+            combineall,
+            split_id,
+            workers,
+            cuhk03_labeled,
+            cuhk03_classic_split,
+            market1501_500k
+            )
+
+        print('\n')
+        print('  **************** Summary ****************')
+        print('  source            : {}'.format(self.sources))
+        print('  # source datasets : {}'.format(len(self.sources)))
+        print('  # source ids      : {}'.format(self.num_train_pids))
+        print('  # source images   : {}'.format(len_trainset))
+        print('  # source cameras  : {}'.format(self.num_train_cams))
+        if load_train_targets:
+            print(
+                '  # target images   : {} (unlabeled)'.format(len_trainset_t)
+            )
+        print('  target            : {}'.format(self.targets))
+        print('  *****************************************')
+        print('\n')
+
+
+    def init_train_loader(self,
+        trainset, 
+        trainset_t,
+        root,
+        k_tfm, 
+        train_sampler,
+        batch_size_train,
+        num_instances,
+        num_cams,
+        workers,
+        num_datasets,
+        combineall,
+        load_train_targets, 
+        split_id, 
+        cuhk03_labeled, 
+        cuhk03_classic_split, 
+        market1501_500k):
+
+        print('=> Loading train (source) dataset')
+        # trainset = []
+
         for name in self.sources:
             trainset_ = init_image_dataset(
                 name,
@@ -236,7 +314,7 @@ class ImageDataManager(DataManager):
                 'sources={} and targets={} must not have overlap'.format(self.sources, self.targets)
 
             print('=> Loading train (target) dataset')
-            trainset_t = []
+            # trainset_t = []
             for name in self.targets:
                 trainset_t_ = init_image_dataset(
                     name,
@@ -269,7 +347,19 @@ class ImageDataManager(DataManager):
                 pin_memory=self.use_gpu,
                 drop_last=True
             )
+        return len(trainset), len(trainset_t)
 
+
+    def init_test_loader(self,
+        root,
+        batch_size_test,
+        combineall,
+        split_id,
+        workers,
+        cuhk03_labeled,
+        cuhk03_classic_split,
+        market1501_500k
+        ):
         print('=> Loading test (target) dataset')
         self.test_loader = {
             name: {
@@ -333,25 +423,19 @@ class ImageDataManager(DataManager):
             self.test_dataset[name]['query'] = queryset.query
             self.test_dataset[name]['gallery'] = galleryset.gallery
 
-        print('\n')
-        print('  **************** Summary ****************')
-        print('  source            : {}'.format(self.sources))
-        print('  # source datasets : {}'.format(len(self.sources)))
-        print('  # source ids      : {}'.format(self.num_train_pids))
-        print('  # source images   : {}'.format(len(trainset)))
-        print('  # source cameras  : {}'.format(self.num_train_cams))
-        if load_train_targets:
-            print(
-                '  # target images   : {} (unlabeled)'.format(len(trainset_t))
-            )
-        print('  target            : {}'.format(self.targets))
-        print('  *****************************************')
-        print('\n')
-
+    def QAConv_train_loader(self):
+        '''
+        This defination modifies the data manager based on QAConv
+        '''
+        # make necessary changes then pass required arguments
+        print("Transfromation rule updated!!")
+        self.transform_tr = self.after_transform
+        self.init_train_loader(*self.args)
+        
 
  # ===================================================================================================================================================== #       
         
-        
+
 class VideoDataManager(DataManager):
     r"""Video data manager.
 
