@@ -323,11 +323,11 @@ def build_transforms(
     print('Building test transforms ...')
     print('+ resize to {}x{}'.format(height, width))
     print('+ to torch tensor of range [0, 1]')
-    print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
-
+    
     if QAConv_T:
         transform_te = transform_tr
     else:
+        print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
         transform_te = Compose([
             Resize((height, width)),
             ToTensor(),
