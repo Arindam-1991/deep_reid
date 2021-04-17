@@ -90,7 +90,7 @@ class ImageQAConvEngine(Engine):
         if self.use_gpu:
             self.criterion_clsmloss = self.criterion_clsmloss.cuda()
 
-        print('... In QAConv Engine : {}, batch_size : {}'.format(self.datamanager.train_loader.sampler.num_instances, self.datamanager.train_loader.batch_size))
+#         print('... In QAConv Engine : {}, batch_size : {}'.format(self.datamanager.train_loader.sampler.num_instances, self.datamanager.train_loader.batch_size))
 
     def optim_param(self):
         lr = list(map(lambda group: group['lr'], self.optimizer.param_groups))
