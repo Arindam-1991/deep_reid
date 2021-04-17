@@ -5,7 +5,8 @@ from collections import deque
 import torch
 from PIL import Image
 from torchvision.transforms import (
-    Resize, Compose, ToTensor, Normalize, ColorJitter, RandomHorizontalFlip
+    Resize, Compose, ToTensor, Normalize, ColorJitter, 
+    RandomHorizontalFlip, Pad, RandomCrop, RandomRotation
 )
 
 
@@ -230,12 +231,34 @@ class RandomPatch(object):
         return img
 
 
+class RandomOcclusion(object):
+    def __init__(self, min_size=0.2, max_size=1):
+        self.min_size = min_size
+        self.max_size = max_size
+
+    def __call__(self, img):
+        if self.max_size == 0:
+            return img
+        H = img.height
+        W = img.width
+        S = min(H, W)
+        s = np.random.randint(max(1, int(S * self.min_size)), int(S * self.max_size))
+        x0 = np.random.randint(W - s)
+        y0 = np.random.randint(H - s)
+        x1 = x0 + s
+        y1 = y0 + s
+        block = Image.new('RGB', (s, s), (255, 255, 255))
+        img.paste(block, (x0, y0, x1, y1))
+        return img
+
 def build_transforms(
     height,
     width,
     transforms='random_flip',
     norm_mean=[0.485, 0.456, 0.406],
     norm_std=[0.229, 0.224, 0.225],
+    min_size = 0,
+    max_size = 0.8,
     **kwargs
 ):
     """Builds train and test transform functions.
@@ -277,10 +300,7 @@ def build_transforms(
     transform_tr = []
 
     print('+ resize to {}x{}'.format(height, width))
-    if QAConv_T:
-        transform_tr += [Resize((height, width), interpolation=3)]
-    else:
-        transform_tr += [Resize((height, width))]
+    transform_tr += [Resize((height, width))]
 
     if 'random_flip' in transforms:
         print('+ random flip')
@@ -309,23 +329,39 @@ def build_transforms(
     print('+ to torch tensor of range [0, 1]')
     transform_tr += [ToTensor()]
 
-    # Normalization is not performed for QA_transform
-    if not QAConv_T:
-        print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
-        transform_tr += [normalize]
+    print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
+    transform_tr += [normalize]
 
     if 'random_erase' in transforms:
         print('+ random erase')
         transform_tr += [RandomErasing(mean=norm_mean)]
 
+    if QAConv_T:
+        print('Overwriting all transforms with QAConv set of transforms!')
+        transform_tr = [
+            Resize((height, width), interpolation=3),
+            Pad(10),
+            RandomCrop((height, width)),
+            RandomHorizontalFlip(0.5),
+            RandomRotation(5), 
+            ColorJitter(brightness=(0.5, 2.0), contrast=(0.5, 2.0), saturation=(0.5, 2.0), hue=(-0.1, 0.1)),
+            RandomOcclusion(min_size, max_size),
+            ToTensor(),
+            ]
+
     transform_tr = Compose(transform_tr)
 
+
+    # Composing Test Transforms
     print('Building test transforms ...')
     print('+ resize to {}x{}'.format(height, width))
     print('+ to torch tensor of range [0, 1]')
-    
     if QAConv_T:
-        transform_te = transform_tr
+        # transform_te = transform_tr
+        transform_te = Compose([
+        Resize((height, width), interpolation=3),
+        ToTensor(),
+        ])
     else:
         print('+ normalization (mean={}, std={})'.format(norm_mean, norm_std))
         transform_te = Compose([
@@ -333,7 +369,5 @@ def build_transforms(
             ToTensor(),
             normalize,
         ])
-    # print('printing transform train', transform_tr)
-    # print('printing transform test', transform_te)
 
     return transform_tr, transform_te
