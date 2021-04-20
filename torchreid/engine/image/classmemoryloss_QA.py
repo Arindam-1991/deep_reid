@@ -103,9 +103,6 @@ class ImageQAConvEngine(Engine):
         if self.use_gpu:
             self.criterion_clsmloss = self.criterion_clsmloss.cuda()
 
-        # print('... In QAConv Engine : {}, batch_size : {}'.format(self.datamanager.train_loader.sampler.num_instances, self.datamanager.train_loader.batch_size))
-
-
     def save_model(self, epoch, rank1, save_dir, is_best=False):
         save_checkpoint(
             {
@@ -119,7 +116,6 @@ class ImageQAConvEngine(Engine):
             is_best = is_best)
 
 
-# --- Modifying run and train definations of engine (in below code)
     def run(
         self,
         save_dir='log',
@@ -197,9 +193,6 @@ class ImageQAConvEngine(Engine):
             )
 
         print(".... Running from new engine run defination ... !")
-        # print(self.datamanager.transform_tr)
-        # self.datamanager.QAConv_train_loader()
-        # print(self.datamanager.transform_tr)
 
         # Pre-training the network for warm-start
         self.pretrain(test_only, save_dir) # test_only automatically loads model from checkpoint
@@ -338,13 +331,10 @@ class ImageQAConvEngine(Engine):
         info_dict = {} # Dictonary containing all the information (loss, accuracy, lr etc)
         if self.weight_t > 0:
             losses_t = AverageMeter()
-            # info_dict['loss_t_avg'] = None
 
         if self.weight_clsm > 0:
             losses_clsm = AverageMeter()
             precisions = AverageMeter()
-            # info_dict['loss_clsm_avg'] = None
-            # info_dict['loss_acc_avg'] = None
 
         self.set_model_mode('train')
 
@@ -520,12 +510,9 @@ class ImageQAConvEngine(Engine):
 
         return cmc[0], mAP
 
-# --- Modifying run and train definations of engine (in upper code)
-
 
     def forward_backward(self, data):
         imgs, pids, camids, dsetids = self.parse_data_for_train_DG(data)
-        # print('... camids ... {} '.format(camids))
 
         if self.use_gpu:
             imgs = imgs.cuda()
@@ -534,9 +521,6 @@ class ImageQAConvEngine(Engine):
         self.targets_sz = pids.size(0)
 
         features = self.model(imgs)
-        # print('... Shape of features : {}'.format(features.size()))
-        # t = torch.reshape(features, (int(32 / 4), 4, 2048))
-        # print('... Shape of transformed features : {}'.format(t.size()))
 
         loss = 0
         loss_summary = {}
