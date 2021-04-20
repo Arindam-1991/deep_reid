@@ -14,11 +14,11 @@ from ..pretrainer import PreTrainer
 import time, datetime
 from torch import nn
 from torchreid.utils import (
-    MetricMeter, AverageMeter, re_ranking, open_all_layers, save_checkpoint, Logger,
+    MetricMeter, AverageMeter, re_ranking, open_all_layers, Logger,
     open_specified_layers, visualize_ranked_results
 )
 from torch.utils.tensorboard import SummaryWriter
-from torchreid.utils.serialization import load_checkpoint
+from torchreid.utils.serialization import load_checkpoint, save_checkpoint
 
 
 class ImageQAConvEngine(Engine):
@@ -105,7 +105,7 @@ class ImageQAConvEngine(Engine):
             self.criterion_clsmloss = self.criterion_clsmloss.cuda()
 
 
-    def save_model(self, epoch, rank1, save_dir, is_best=False):
+    def save_model(self, epoch, rank1, save_dir):
         save_checkpoint(
             {
             'model': self.model.module.state_dict(),
@@ -113,9 +113,9 @@ class ImageQAConvEngine(Engine):
             'optim': self.optimizer.state_dict(),
             'epoch': epoch + 1,
             'rank1': rank1
-            }, 
-            fpath = osp.join(save_dir, self.method_name, self.sub_method_name, 'checkpoint.pth.tar'),
-            is_best = is_best)
+            },
+            fpath = osp.join(save_dir, self.method_name, self.sub_method_name, 'checkpoint.pth.tar')
+            )
     
 
     def pretrain(self, test_only, output_dir):
