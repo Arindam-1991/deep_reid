@@ -78,3 +78,26 @@ def cosine_distance(input1, input2):
     input2_normed = F.normalize(input2, p=2, dim=1)
     distmat = 1 - torch.mm(input1_normed, input2_normed.t())
     return distmat
+
+
+def pairwise_distance_using_QAmatcher(matcher, prob_fea, gal_fea, prob_batch_size=4096, gal_batch_size=4):
+    print('... Evaluating from pairwise_distance_using_QAmatcher ...')
+    num_gals = gal_fea.size(0)
+    num_probs = prob_fea.size(0)
+
+    if gal_batch_size is None:
+        gal_batch_size = num_gals
+    if prob_batch_size is None:
+        prob_batch_size = num_probs
+
+    score = torch.zeros(num_probs, num_gals, device=prob_fea.device)
+    matcher.eval()
+    for i in range(0, num_probs, prob_batch_size):
+        j = min(i + prob_batch_size, num_probs)
+        matcher.make_kernel(prob_fea[i: j, :, :, :].cuda())
+        for k in range(0, num_gals, gal_batch_size):
+            k2 = min(k + gal_batch_size, num_gals)
+            score[i: j, k: k2] = matcher(gal_fea[k: k2, :, :, :].cuda())
+    # scale matching scores to make them visually more recognizable
+    score = torch.sigmoid(score / 10)
+    return (1. - score).cpu()  # [p, g]
