@@ -1,5 +1,6 @@
 from __future__ import division, print_function, absolute_import
 
+import numpy as np
 import torch #, sys
 import os.path as osp
 from torchreid import metrics
@@ -16,6 +17,7 @@ from torchreid.utils import (
     open_specified_layers, visualize_ranked_results
 )
 from torch.utils.tensorboard import SummaryWriter
+from torchreid.utils.serialization import load_checkpoint
 
 
 class ImageQAConvEngine(Engine):
@@ -86,6 +88,7 @@ class ImageQAConvEngine(Engine):
         super(ImageQAConvEngine, self).__init__(datamanager, use_gpu)
         self.datamanager = datamanager
         self.model = model
+        self.matcher = matcher
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.register_model('model', model, optimizer, scheduler)
@@ -96,7 +99,7 @@ class ImageQAConvEngine(Engine):
         self.weight_clsm = weight_clsm
 
         self.criterion_t = TripletLoss(margin=margin)
-        self.criterion_clsmloss = ClassMemoryLoss(matcher, datamanager.num_train_pids, mem_batch_size = mem_batch_size)
+        self.criterion_clsmloss = ClassMemoryLoss(self.matcher, datamanager.num_train_pids, mem_batch_size = mem_batch_size)
         if self.use_gpu:
             self.criterion_clsmloss = self.criterion_clsmloss.cuda()
 
@@ -138,6 +141,8 @@ class ImageQAConvEngine(Engine):
         enhance_data_aug = False,
         method_name = 'QAConv',
         sub_method_name = 'res50_layer3',
+        qbatch_sz = None,
+        gbatch_sz = None,
         normalize_feature=False,
         visrank=False,
         visrank_topk=10,
@@ -183,6 +188,8 @@ class ImageQAConvEngine(Engine):
         self.enhance_data_aug = enhance_data_aug
         self.method_name = method_name
         self.sub_method_name = sub_method_name
+        self.qbatch_sz = qbatch_sz
+        self.gbatch_sz = gbatch_sz
 
         if visrank and not test_only:
             raise ValueError(
@@ -227,7 +234,7 @@ class ImageQAConvEngine(Engine):
                 open_layers=open_layers
             )
 
-            train_time = time.time() - t0
+            train_time = time.time() - time_start
             lr = info_dict['lr']
             if print_epoch:
                 if self.weight_t > 0 and self.weight_clsm > 0:
@@ -410,6 +417,108 @@ class ImageQAConvEngine(Engine):
             info_dict['loss_clsm_avg'] = losses_clsm.avg
             info_dict['prec_avg'] = precisions.avg
         return info_dict
+
+
+    # Defining evaluation mechanism
+    @torch.no_grad()
+    def _evaluate(
+        self,
+        dataset_name='',
+        query_loader=None,
+        gallery_loader=None,
+        dist_metric='euclidean',
+        normalize_feature=False,
+        visrank=False,
+        visrank_topk=10,
+        save_dir='',
+        use_metric_cuhk03=False,
+        ranks=[1, 5, 10, 20],
+        rerank=False,
+    ):
+        batch_time = AverageMeter()
+
+        def _feature_extraction(data_loader):
+            f_, pids_, camids_ = [], [], []
+            for batch_idx, data in enumerate(data_loader):
+                imgs, pids, camids = self.parse_data_for_eval(data)
+                if self.use_gpu:
+                    imgs = imgs.cuda()
+                end = time.time()
+                features = self.extract_features(imgs)
+                batch_time.update(time.time() - end)
+                features = features.data.cpu()
+                f_.append(features)
+                pids_.extend(pids)
+                camids_.extend(camids)
+            f_ = torch.cat(f_, 0)
+            pids_ = np.asarray(pids_)
+            camids_ = np.asarray(camids_)
+            return f_, pids_, camids_
+
+        print('Extracting features from query set ...')
+        qf, q_pids, q_camids = _feature_extraction(query_loader)
+        print('Done, obtained {}-by-{} matrix'.format(qf.size(0), qf.size(1)))
+
+        print('Extracting features from gallery set ...')
+        gf, g_pids, g_camids = _feature_extraction(gallery_loader)
+        print('Done, obtained {}-by-{} matrix'.format(gf.size(0), gf.size(1)))
+
+        print('Speed: {:.4f} sec/batch'.format(batch_time.avg))
+
+        if normalize_feature:
+            print('Normalzing features with L2 norm ...')
+            qf = F.normalize(qf, p=2, dim=1)
+            gf = F.normalize(gf, p=2, dim=1)
+
+        print(
+            'Computing distance matrix is with metric={} ...'.format('QAConv_kernel')
+        )
+        distmat = metrics.pairwise_distance_using_QAmatcher(
+            self.matcher, qf, gf, 
+            prob_batch_size = self.qbatch_sz, 
+            gal_batch_size = self.gbatch_sz)
+        distmat = distmat.numpy()
+
+        if rerank:
+            print('Applying person re-ranking ...')
+            distmat_qq = metrics.pairwise_distance_using_QAmatcher(
+                self.matcher, qf, qf, 
+                prob_batch_size = self.qbatch_sz, 
+                gal_batch_size = self.qbatch_sz)
+            distmat_gg = metrics.pairwise_distance_using_QAmatcher(
+                self.matcher, gf, gf, 
+                prob_batch_size = self.gbatch_sz, 
+                gal_batch_size = self.gbatch_sz)
+            distmat = re_ranking(distmat, distmat_qq, distmat_gg)
+
+        print('Computing CMC and mAP ...')
+        cmc, mAP = metrics.evaluate_rank(
+            distmat,
+            q_pids,
+            g_pids,
+            q_camids,
+            g_camids,
+            use_metric_cuhk03=use_metric_cuhk03
+        )
+
+        print('** Results **')
+        print('mAP: {:.1%}'.format(mAP))
+        print('CMC curve')
+        for r in ranks:
+            print('Rank-{:<3}: {:.1%}'.format(r, cmc[r - 1]))
+
+        if visrank:
+            visualize_ranked_results(
+                distmat,
+                self.datamanager.fetch_test_loaders(dataset_name),
+                self.datamanager.data_type,
+                width=self.datamanager.width,
+                height=self.datamanager.height,
+                save_dir=osp.join(save_dir, 'visrank_' + dataset_name),
+                topk=visrank_topk
+            )
+
+        return cmc[0], mAP
 
 # --- Modifying run and train definations of engine (in upper code)
 
